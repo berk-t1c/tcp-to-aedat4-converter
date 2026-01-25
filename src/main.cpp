@@ -6,7 +6,9 @@
 #include <dv-processing/core/event.hpp>
 
 #include <iostream>
+#include <iomanip>
 #include <chrono>
+#include <thread>
 #include <csignal>
 #include <atomic>
 
