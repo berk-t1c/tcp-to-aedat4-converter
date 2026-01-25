@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
-project(tcp-to-aedat4-converter 
-    VERSION 1.0.0 
-    LANGUAGES CXX
+project(tcp-to-aedat4-converter
+    VERSION 1.0.0
+    LANGUAGES C CXX
     DESCRIPTION "Convert raw binary event camera frames over TCP to AEDAT4 format"
 )
 
