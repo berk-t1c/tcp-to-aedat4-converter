@@ -2,97 +2,87 @@
 
 Convert raw binary event camera frames received over TCP into AEDAT4 format for display in DV software.
 
-## What This Does
+## Overview
 
 ```
-Your FPGA/Camera  ──TCP──►  [This Converter]  ──TCP──►  DV Viewer (visualization)
-   (port 5000)                                            (port 7777)
+FPGA/Camera  ──TCP──►  [Converter]  ──TCP──►  DV Viewer (visualization)
+ (port 5000)                                    (port 7777)
 ```
 
-Your hardware sends binary bit-packed frames over TCP. This software:
-1. Receives those frames
-2. Converts them to AEDAT4 event format
-3. Streams to DV viewer for real-time visualization
+This software acts as a bridge between custom event camera hardware and the DV ecosystem:
+1. Receives binary bit-packed frames over TCP
+2. Converts frames to AEDAT4 event format
+3. Streams events to DV viewer for real-time visualization
 
 ---
 
-## Step-by-Step Setup Guide
+## Installation
 
-### Step 1: Install Ubuntu Dependencies
-
-Open a terminal and run these commands one by one:
+### Step 1: Install Dependencies (Ubuntu 20.04+)
 
 ```bash
 # Update package list
 sudo apt update
 
-# Add iniVation repository (for DV software)
+# Add iniVation repository
 sudo add-apt-repository ppa:inivation-ppa/inivation
 sudo apt update
 
-# Install everything needed
+# Install required packages
 sudo apt install -y build-essential cmake git python3
 sudo apt install -y dv-processing dv-gui
 ```
 
-**What this installs:**
-- `build-essential` - C++ compiler
-- `cmake` - Build system
-- `dv-processing` - Library to create AEDAT4 format
-- `dv-gui` - Viewer to see the events
+**Package descriptions:**
+| Package | Purpose |
+|---------|---------|
+| `build-essential` | C++ compiler (GCC) |
+| `cmake` | Build system |
+| `dv-processing` | AEDAT4 encoding library |
+| `dv-gui` | Event visualization software |
 
-### Step 2: Download and Build the Converter
+### Step 2: Build the Converter
 
 ```bash
-# Go to your home directory
+# Clone repository
 cd ~
-
-# Download the code
 git clone https://github.com/berkyilmaz01/tcp-to-aedat4-converter.git
-
-# Enter the folder
 cd tcp-to-aedat4-converter
 
-# Create build folder
-mkdir build
-cd build
-
-# Configure and compile
+# Build
+mkdir build && cd build
 cmake ..
 make
 ```
 
-If successful, you'll see a file called `converter` in the build folder.
+A successful build produces the `converter` executable in the build directory.
 
-### Step 3: Configure for Your Hardware
+### Step 3: Configure Settings
 
-**IMPORTANT:** Before running, you must configure the settings to match your FPGA output.
-
-Edit the configuration file:
+Edit the configuration file to match the hardware specifications:
 ```bash
-# Open config file in text editor
 nano ~/tcp-to-aedat4-converter/include/config.hpp
 ```
 
-**Settings you MUST check:**
+**Required settings:**
 
-| Setting | Description | Your Value |
-|---------|-------------|------------|
+| Setting | Description | Default |
+|---------|-------------|---------|
 | `width` | Frame width in pixels | 1280 |
 | `height` | Frame height in pixels | 780 |
-| `camera_ip` | IP address of your FPGA | Change to your FPGA's IP |
-| `camera_port` | TCP port your FPGA sends on | 5000 (or your port) |
-| `has_header` | Does FPGA send 4-byte size before each frame? | `true` or `false` |
+| `camera_ip` | FPGA/camera IP address | 127.0.0.1 |
+| `camera_port` | TCP port for incoming frames | 5000 |
+| `has_header` | Whether frames include 4-byte size header | true |
 
-**Settings to try if image looks wrong:**
+**Bit unpacking settings (adjust if output appears incorrect):**
 
-| Setting | Try if... |
-|---------|-----------|
-| `msb_first = true` | Image looks like random noise |
-| `positive_first = false` | Colors are inverted |
-| `row_major = false` | Image is rotated 90 degrees |
+| Setting | Effect |
+|---------|--------|
+| `msb_first = true` | Use if output appears as random noise |
+| `positive_first = false` | Use if polarity is inverted |
+| `row_major = false` | Use if image is rotated 90 degrees |
 
-After editing, save (Ctrl+O, Enter, Ctrl+X in nano) and rebuild:
+After modifying settings, rebuild:
 ```bash
 cd ~/tcp-to-aedat4-converter/build
 make
@@ -100,18 +90,18 @@ make
 
 ---
 
-## How to Test (Without Real Hardware)
+## Testing with Simulator
 
-Before connecting your real hardware, test with the fake camera simulator.
+Before connecting hardware, verify the setup using the included camera simulator.
 
-### Test Setup (3 Terminals)
+### Test Procedure (Requires 3 Terminals)
 
-**Open Terminal 1 - Start Fake Camera:**
+**Terminal 1 - Start Camera Simulator:**
 ```bash
 cd ~/tcp-to-aedat4-converter
 python3 test/fake_camera.py
 ```
-You should see:
+Expected output:
 ```
 Fake camera listening on port 5000
 Frame size: 249600 bytes (1280x780, 2 channels)
@@ -119,12 +109,12 @@ Target FPS: 500
 Waiting for connection...
 ```
 
-**Open Terminal 2 - Start Converter:**
+**Terminal 2 - Start Converter:**
 ```bash
 cd ~/tcp-to-aedat4-converter/build
 ./converter
 ```
-You should see:
+Expected output:
 ```
 TCP to AEDAT4 Converter
 Configuration:
@@ -134,61 +124,65 @@ Connecting to camera...
 Connected successfully!
 ```
 
-**Open Terminal 3 - Start DV Viewer:**
+**Terminal 3 - Start DV Viewer:**
 ```bash
 dv-gui
 ```
 
-### Connect DV Viewer to See Events
+### DV Viewer Configuration
 
-1. In DV GUI, click **"Add Module"** (top left)
+1. Click **"Add Module"** (top left)
 2. Select **"Input"** → **"Network TCP Client"**
-3. In the module settings (right panel):
-   - Set **IP Address**: `127.0.0.1`
-   - Set **Port**: `7777`
-4. Click the **Play button** (triangle) to start
-5. You should see two moving circles (one for each polarity)
+3. Configure module settings:
+   - **IP Address**: `127.0.0.1`
+   - **Port**: `7777`
+4. Click the **Play button** to start visualization
+5. Two moving circles should appear (positive and negative polarity events)
 
-### Screenshot of Expected Result
 ```
-+----------------------------------+
-|  DV Viewer                       |
-|  ┌────────────────────────────┐  |
-|  │     ●                      │  |  ← Positive events (moving horizontally)
-|  │           ○                │  |  ← Negative events (moving vertically)
-|  │                            │  |
-|  └────────────────────────────┘  |
-|  FPS: 500  Events: 15000/frame   |
-+----------------------------------+
+Expected visualization:
+┌────────────────────────────┐
+│     ●                      │  ← Positive events (horizontal motion)
+│           ○                │  ← Negative events (vertical motion)
+│                            │
+└────────────────────────────┘
 ```
 
 ---
 
-## How to Connect Your Real Hardware
+## Hardware Connection
 
-### Network Setup
+### Network Configuration
 
-1. **Connect your FPGA/camera to the same network as your PC**
-   - Direct Ethernet cable: Set static IPs (e.g., FPGA: 192.168.1.100, PC: 192.168.1.1)
-   - Through switch/router: Both get IPs from DHCP or set static
+**Option A: Direct Connection**
+- Connect FPGA directly to PC via Ethernet cable
+- Configure static IPs:
+  - FPGA: 192.168.1.100
+  - PC: 192.168.1.1
 
-2. **Find your FPGA's IP address** and update config:
-   ```bash
-   nano ~/tcp-to-aedat4-converter/include/config.hpp
-   ```
-   Change:
-   ```cpp
-   std::string camera_ip = "192.168.1.100";  // Your FPGA's IP
-   int camera_port = 5000;                    // Your FPGA's port
-   ```
+**Option B: Through Network Switch**
+- Connect both devices to the same switch/router
+- Use DHCP or configure static IPs on the same subnet
 
-3. **Rebuild:**
-   ```bash
-   cd ~/tcp-to-aedat4-converter/build
-   make
-   ```
+### Software Configuration
 
-### Running with Real Hardware
+Update the configuration file with the FPGA network settings:
+```bash
+nano ~/tcp-to-aedat4-converter/include/config.hpp
+```
+
+```cpp
+std::string camera_ip = "192.168.1.100";  // FPGA IP address
+int camera_port = 5000;                    // FPGA TCP port
+```
+
+Rebuild after configuration changes:
+```bash
+cd ~/tcp-to-aedat4-converter/build
+make
+```
+
+### Running with Hardware
 
 **Terminal 1 - Start Converter:**
 ```bash
@@ -199,18 +193,16 @@ cd ~/tcp-to-aedat4-converter/build
 **Terminal 2 - Start DV Viewer:**
 ```bash
 dv-gui
-# Then connect to 127.0.0.1:7777 as described above
+# Connect to 127.0.0.1:7777 as described above
 ```
 
-**On your FPGA:** Start sending frames to the PC's IP on port 5000.
+**FPGA Side:** Initiate frame transmission to the PC IP address on port 5000.
 
 ---
 
 ## Frame Format Specification
 
-Your FPGA must send data in this format:
-
-### With Header (has_header = true)
+### Packet Structure (with header)
 ```
 ┌──────────────────┬─────────────────────────────────────────┐
 │ 4 bytes (uint32) │              Frame Data                 │
@@ -219,7 +211,7 @@ Your FPGA must send data in this format:
 └──────────────────┴─────────────────────────────────────────┘
 ```
 
-### Frame Data Structure
+### Frame Data Layout
 ```
 ┌─────────────────────────────┬─────────────────────────────┐
 │     Positive Channel        │     Negative Channel        │
@@ -230,30 +222,31 @@ Your FPGA must send data in this format:
 
 ### Bit Packing (Default: LSB first, Row-major)
 ```
-Byte 0: [pixel7][pixel6][pixel5][pixel4][pixel3][pixel2][pixel1][pixel0]
-        (if msb_first=false, pixel0 is bit 0)
+Byte 0: [bit7][bit6][bit5][bit4][bit3][bit2][bit1][bit0]
+        (msb_first=false: bit0 corresponds to first pixel)
 
-Pixels are arranged row by row:
+Pixel arrangement (row-major):
   Row 0: pixels 0-1279
   Row 1: pixels 1280-2559
   ...
+  Row 779: pixels 997,120-998,399
 ```
 
-### Example: Sending from FPGA (Pseudocode)
+### FPGA Implementation Reference (Pseudocode)
 ```verilog
-// Send header (4 bytes, little-endian)
+// Transmit header (4 bytes, little-endian)
 send_byte(frame_size[7:0]);
 send_byte(frame_size[15:8]);
 send_byte(frame_size[23:16]);
 send_byte(frame_size[31:24]);
 
-// Send positive channel (124,800 bytes)
-for each byte in positive_channel:
-    send_byte(byte);
+// Transmit positive channel (124,800 bytes)
+for i = 0 to 124799:
+    send_byte(positive_channel[i]);
 
-// Send negative channel (124,800 bytes)
-for each byte in negative_channel:
-    send_byte(byte);
+// Transmit negative channel (124,800 bytes)
+for i = 0 to 124799:
+    send_byte(negative_channel[i]);
 ```
 
 ---
@@ -262,86 +255,89 @@ for each byte in negative_channel:
 
 ### Connection Issues
 
-| Problem | Solution |
-|---------|----------|
-| "Failed to connect to camera" | Check FPGA IP address and port in config. Ping FPGA from PC. |
-| "Connection closed by server" | FPGA stopped sending. Check FPGA is running. |
-| No events in DV viewer | Make sure DV is connected to port 7777, not 5000. |
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| "Failed to connect to camera" | Incorrect IP/port or network issue | Verify IP address in config; test with `ping` |
+| "Connection closed by server" | FPGA stopped transmitting | Verify FPGA is running and sending data |
+| No events in DV viewer | DV connected to wrong port | Connect DV to port 7777 (not 5000) |
 
-### Image Issues
+### Image Quality Issues
 
-| Problem | Solution |
+| Symptom | Solution |
 |---------|----------|
-| Image looks like random noise | Try `msb_first = true` in config |
-| Colors/polarity inverted | Try `positive_first = false` in config |
-| Image rotated 90 degrees | Try `row_major = false` in config |
-| Only half the image shows | Check `width` and `height` match your sensor |
-| Frames are incomplete | Check `has_header` setting matches FPGA |
+| Random noise pattern | Set `msb_first = true` |
+| Inverted polarity | Set `positive_first = false` |
+| 90-degree rotation | Set `row_major = false` |
+| Partial image | Verify `width` and `height` match sensor resolution |
+| Incomplete frames | Verify `has_header` setting matches FPGA output |
 
 ### Performance Issues
 
-| Problem | Solution |
+| Symptom | Solution |
 |---------|----------|
-| Low FPS | Check network connection. Use wired Ethernet, not WiFi. |
-| Frames dropping | Increase `recv_buffer_size` in config (default: 50MB) |
-| High latency | This is normal for TCP. Use direct Ethernet connection. |
+| Low frame rate | Use wired Ethernet (not WiFi) |
+| Dropped frames | Increase `recv_buffer_size` (default: 50MB) |
+| High latency | Use direct Ethernet connection |
 
 ---
 
 ## Quick Reference
 
-### Commands Cheat Sheet
+### Commands
 
 ```bash
-# Build the converter
+# Build
 cd ~/tcp-to-aedat4-converter/build && make
 
-# Run the converter
+# Run converter
 ./converter
 
-# Run fake camera for testing
+# Run simulator
 python3 ~/tcp-to-aedat4-converter/test/fake_camera.py
 
-# Run fake camera with different settings
+# Run simulator with options
 python3 test/fake_camera.py --port 5000 --fps 100
 
-# Open DV viewer
+# Launch DV viewer
 dv-gui
 ```
 
-### Port Numbers
+### Network Ports
 
-| Port | Used By | Direction |
-|------|---------|-----------|
-| 5000 | Camera/FPGA | Camera → Converter |
-| 7777 | DV Viewer | Converter → Viewer |
+| Port | Function | Direction |
+|------|----------|-----------|
+| 5000 | Frame input | Camera/FPGA → Converter |
+| 7777 | Event output | Converter → DV Viewer |
 
 ### File Locations
 
-| File | Purpose |
-|------|---------|
-| `include/config.hpp` | All settings (edit this!) |
-| `build/converter` | The main program |
-| `test/fake_camera.py` | Test simulator |
+| File | Description |
+|------|-------------|
+| `include/config.hpp` | Configuration settings |
+| `build/converter` | Main executable |
+| `test/fake_camera.py` | Camera simulator |
 
 ---
 
 ## Technical Specifications
 
-- **Resolution:** 1280 x 780 pixels
-- **Frame size:** 249,600 bytes (2 channels x 124,800 bytes)
-- **Target FPS:** 500-1000 frames per second
-- **Throughput:** Up to 250 MB/s (works with 1GbE and 10GbE)
-- **Protocol:** TCP/IP
-- **Output format:** AEDAT4 (compatible with DV software)
+| Parameter | Value |
+|-----------|-------|
+| Resolution | 1280 x 780 pixels |
+| Frame size | 249,600 bytes |
+| Channels | 2 (positive + negative) |
+| Target frame rate | 500-1000 FPS |
+| Maximum throughput | 250 MB/s |
+| Network support | 1GbE, 10GbE |
+| Protocol | TCP/IP |
+| Output format | AEDAT4 |
 
 ---
 
-## Need Help?
+## Additional Resources
 
-1. Check the troubleshooting section above
-2. Look at [ARCHITECTURE.md](ARCHITECTURE.md) for technical details
-3. Contact: Berk Yilmaz
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Technical design documentation
+- Contact: Berk Yilmaz
 
 ## License
 
