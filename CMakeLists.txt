@@ -59,6 +59,66 @@ endif()
 # Install target (optional)
 install(TARGETS converter DESTINATION bin)
 
+# =========================================================================
+# TESTING
+# =========================================================================
+option(BUILD_TESTING "Build unit tests" OFF)
+
+if(BUILD_TESTING)
+    enable_testing()
+
+    # Fetch Google Test
+    include(FetchContent)
+    FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG v1.14.0
+    )
+    # Prevent overriding parent project's compiler/linker settings on Windows
+    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(googletest)
+
+    # Create test library with common code
+    add_library(converter_lib STATIC
+        src/tcp_receiver.cpp
+        src/frame_unpacker.cpp
+    )
+    target_include_directories(converter_lib PUBLIC
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    target_link_libraries(converter_lib PUBLIC
+        dv::processing
+        ${OpenCV_LIBS}
+    )
+    if(WIN32)
+        target_link_libraries(converter_lib PUBLIC ws2_32)
+    endif()
+    if(UNIX AND NOT APPLE)
+        target_link_libraries(converter_lib PUBLIC pthread)
+    endif()
+
+    # Unit tests executable
+    add_executable(unit_tests
+        test/unit/test_config.cpp
+        test/unit/test_frame_unpacker.cpp
+        test/fixtures/test_frames.hpp
+    )
+    target_include_directories(unit_tests PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/test
+    )
+    target_link_libraries(unit_tests PRIVATE
+        converter_lib
+        GTest::gtest_main
+    )
+
+    # Register tests with CTest
+    include(GoogleTest)
+    gtest_discover_tests(unit_tests)
+
+    message(STATUS "Testing enabled - unit_tests target available")
+endif()
+
 # Print configuration summary
 message(STATUS "")
 message(STATUS "=== TCP to AEDAT4 Converter Configuration ===")
