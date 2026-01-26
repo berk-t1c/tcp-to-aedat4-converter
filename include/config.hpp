@@ -117,7 +117,8 @@ struct Config {
     // Microseconds between frames (for timestamp generation)
     // 2000 us = 500 FPS
     // 1000 us = 1000 FPS
-    int64_t frame_interval_us = 2000;
+    // 200 us = 5000 FPS (for 10G Ethernet demo)
+    int64_t frame_interval_us = 200;
     
     // =========================================================================
     // DEBUG SETTINGS
