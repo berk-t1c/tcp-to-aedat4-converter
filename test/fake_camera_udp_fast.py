@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Fast UDP Camera Simulator - Pre-generates frames for maximum throughput
+Matches converter config: 1280x780, UDP protocol
 
 Usage:
     python3 fake_camera_udp_fast.py --port 5000 --fps 5000
@@ -13,7 +14,7 @@ import signal
 import sys
 import os
 
-# Frame configuration (must match config.hpp)
+# Frame configuration - MUST match config.hpp
 WIDTH = 1280
 HEIGHT = 780
 CHANNELS = 2
@@ -31,7 +32,7 @@ def main():
     parser = argparse.ArgumentParser(description="Fast UDP camera simulator")
     parser.add_argument("--port", type=int, default=5000, help="UDP port")
     parser.add_argument("--target", type=str, default="127.0.0.1", help="Target IP")
-    parser.add_argument("--fps", type=int, default=5000, help="Target FPS")
+    parser.add_argument("--fps", type=int, default=5000, help="Target FPS (0=unlimited)")
     parser.add_argument("--packet-size", type=int, default=8192, help="UDP packet size")
     args = parser.parse_args()
 
@@ -49,10 +50,11 @@ def main():
         packets.append(frame_data[offset:offset + args.packet_size])
         offset += args.packet_size
 
-    print(f"Frame size: {FRAME_SIZE:,} bytes")
+    print(f"Frame size: {FRAME_SIZE:,} bytes ({WIDTH}x{HEIGHT})")
     print(f"Packets per frame: {len(packets)}")
-    print(f"Target FPS: {args.fps}")
-    print(f"Target throughput: {FRAME_SIZE * args.fps * 8 / 1_000_000:.1f} Mbps")
+    print(f"Target FPS: {args.fps if args.fps > 0 else 'unlimited'}")
+    if args.fps > 0:
+        print(f"Target throughput: {FRAME_SIZE * args.fps * 8 / 1_000_000:.1f} Mbps")
     print()
 
     # Create UDP socket with large buffer
@@ -60,7 +62,7 @@ def main():
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, 50 * 1024 * 1024)
 
     target = (args.target, args.port)
-    frame_interval = 1.0 / args.fps
+    frame_interval = 1.0 / args.fps if args.fps > 0 else 0
 
     frame_num = 0
     start_time = time.time()
@@ -85,11 +87,12 @@ def main():
             print(f"Frames: {frame_num:,} | FPS: {fps:.0f} | Throughput: {mbps:.1f} Mbps")
             last_print = now
 
-        # Rate limiting
-        target_time = start_time + frame_num * frame_interval
-        sleep_time = target_time - time.time()
-        if sleep_time > 0:
-            time.sleep(sleep_time)
+        # Rate limiting (skip if fps=0 for max speed)
+        if frame_interval > 0:
+            target_time = start_time + frame_num * frame_interval
+            sleep_time = target_time - time.time()
+            if sleep_time > 0:
+                time.sleep(sleep_time)
 
     elapsed = time.time() - start_time
     print()
