@@ -1,4 +1,4 @@
-# TCP to AEDAT4 Converter
+# TCP/UDP to AEDAT4 Converter
 
 Convert raw binary event camera frames received over TCP into AEDAT4 format for display in DV software.
 
